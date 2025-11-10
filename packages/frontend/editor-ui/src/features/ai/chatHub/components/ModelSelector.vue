@@ -20,6 +20,7 @@ import { useI18n } from '@n8n/i18n';
 
 import type { CredentialsMap } from '../chat.types';
 import CredentialSelectorModal from './CredentialSelectorModal.vue';
+import ModelByIdSelectorModal from './ModelByIdSelectorModal.vue';
 import { useUIStore } from '@/app/stores/ui.store';
 import { useCredentialsStore } from '@/features/credentials/credentials.store';
 import ChatAgentAvatar from '@/features/ai/chatHub/components/ChatAgentAvatar.vue';
@@ -53,10 +54,24 @@ function handleSelectCredentials(provider: ChatHubProvider, id: string) {
 	emit('selectCredential', provider, id);
 }
 
+function handleSelectModelById(provider: ChatHubLLMProvider, modelId: string) {
+	emit('change', {
+		model: {
+			provider,
+			model: modelId,
+		},
+		name: modelId,
+		description: null,
+		updatedAt: null,
+		createdAt: null,
+	});
+}
+
 const i18n = useI18n();
 const agents = ref<ChatModelsResponse>(emptyChatModelsResponse);
 const dropdownRef = useTemplateRef('dropdownRef');
 const credentialSelectorProvider = ref<ChatHubLLMProvider | null>(null);
+const modelByIdSelectorProvider = ref<ChatHubLLMProvider | null>(null);
 const uiStore = useUIStore();
 const credentialsStore = useCredentialsStore();
 
@@ -117,9 +132,15 @@ const menu = computed(() => {
 		const submenu = agentOptions.concat([
 			...(agentOptions.length > 0 ? [{ isDivider: true as const, id: 'divider' }] : []),
 			{
+				id: `${provider}::add-model`,
+				icon: 'plus',
+				title: 'Add model',
+				disabled: false,
+			},
+			{
 				id: `${provider}::configure`,
 				icon: 'settings',
-				title: 'Configure credentials...',
+				title: 'Configure credentials',
 				disabled: false,
 			},
 		]);
@@ -149,6 +170,11 @@ function openCredentialsSelectorOrCreate(provider: ChatHubLLMProvider) {
 	uiStore.openModal('chatCredentialSelector');
 }
 
+function openModelByIdSelector(provider: ChatHubLLMProvider) {
+	modelByIdSelectorProvider.value = provider;
+	uiStore.openModal('chatModelByIdSelectorModal');
+}
+
 function onSelect(id: string) {
 	if (id === NEW_AGENT_MENU_ID) {
 		emit('createCustomAgent');
@@ -168,6 +194,15 @@ function onSelect(id: string) {
 		parsedModel.provider !== 'custom-agent'
 	) {
 		openCredentialsSelectorOrCreate(parsedModel.provider);
+		return;
+	}
+
+	if (
+		identifier === 'add-model' &&
+		parsedModel.provider !== 'n8n' &&
+		parsedModel.provider !== 'custom-agent'
+	) {
+		openModelByIdSelector(parsedModel.provider);
 		return;
 	}
 
@@ -232,6 +267,13 @@ defineExpose({
 				:initial-value="credentials?.[credentialSelectorProvider] ?? null"
 				@select="handleSelectCredentials"
 				@create-new="handleCreateNewCredential"
+			/>
+
+			<ModelByIdSelectorModal
+				v-if="modelByIdSelectorProvider"
+				:provider="modelByIdSelectorProvider"
+				:initial-value="null"
+				@select="handleSelectModelById"
 			/>
 
 			<ChatAgentAvatar
